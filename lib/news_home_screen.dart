@@ -1,8 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:news_app/search_screen.dart';
+import 'package:news_app/settings_page.dart';
 import 'news_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'bottom_nav_bar.dart';
 
 class NewsHomeScreen extends StatefulWidget {
+  final bool isDarkMode;
+  final ValueChanged<bool> onThemeChanged;
+
+  const NewsHomeScreen({
+    Key? key,
+    required this.isDarkMode,
+    required this.onThemeChanged,
+  }) : super(key: key);
   @override
   _NewsHomeScreenState createState() => _NewsHomeScreenState();
 }
@@ -10,6 +21,14 @@ class NewsHomeScreen extends StatefulWidget {
 class _NewsHomeScreenState extends State<NewsHomeScreen> {
   final NewsApiService apiService = NewsApiService();
   String selectedCategory = 'general';
+
+  bool isDarkMode = false;
+
+  void _toggleTheme(bool value) {
+    setState(() {
+      isDarkMode = value;
+    });
+  }
 
   Future<void> _openUrl(String url) async {
     if (await canLaunch(url)) {
@@ -19,42 +38,97 @@ class _NewsHomeScreenState extends State<NewsHomeScreen> {
     }
   }
 
+  int _currentIndex = 1;
+
+  late final List<Widget> _screens;
+  @override
+  void initState() {
+    super.initState();
+    _screens = [
+      NewsHomeScreen(
+        isDarkMode: widget.isDarkMode, // Correct access within a State class
+        onThemeChanged: _toggleTheme,
+      ),
+      SearchScreen(),
+      SettingsPage(
+        isDarkMode: widget.isDarkMode,
+        onThemeChanged: _toggleTheme,
+      ),
+    ];
+  }
+
+  void _onNavBarTap(int index) {
+    if (index == 0) {
+      // Navigate to Search screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => SearchScreen()),
+      );
+    } else if (index == 2) {
+      // Navigate to Settings screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SettingsPage(
+            isDarkMode: widget.isDarkMode,
+            onThemeChanged: widget.onThemeChanged,
+          ),
+        ),
+      );
+    } else {
+      // Update currentIndex for Home
+      setState(() {
+        _currentIndex = index;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
-        title: Text('News App', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: Text('News App',),// style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
         centerTitle: true,
+        // actions: [
+        //   Switch(
+        //     value: widget.isDarkMode,
+        //     onChanged: widget.onThemeChanged,
+        //     activeColor: Colors.blue,
+        //   ),
+        // ],
       ),
-      body: Column(
-        children: [
-          SizedBox(height: 10),
-          _buildCategoryChips(),
-          SizedBox(height: 10),
-          Expanded(
-            child: FutureBuilder<List<dynamic>>(
-              future: apiService.fetchNews(category: selectedCategory),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator(color: Colors.deepPurple));
-                } else if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                } else {
-                  final articles = snapshot.data!;
-                  return ListView.builder(
-                    itemCount: articles.length,
-                    itemBuilder: (context, index) {
-                      final article = articles[index];
-                      return _buildNewsCard(article);
+      body:Column(
+              children: [
+                SizedBox(height: 10),
+                _buildCategoryChips(),
+                SizedBox(height: 10),
+                Expanded(
+                  child: FutureBuilder<List<dynamic>>(
+                    future: apiService.fetchNews(category: selectedCategory),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Center(child: CircularProgressIndicator());
+                      } else if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      } else {
+                        final articles = snapshot.data!;
+                        return ListView.builder(
+                          itemCount: articles.length,
+                          itemBuilder: (context, index) {
+                            final article = articles[index];
+                            return _buildNewsCard(article);
+                          },
+                        );
+                      }
                     },
-                  );
-                }
-              },
+                  ),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
+        bottomNavigationBar: BottomNavBar(
+          currentIndex: _currentIndex,
+          onTap: _onNavBarTap,
+        )
     );
   }
 
@@ -68,16 +142,17 @@ class _NewsHomeScreenState extends State<NewsHomeScreen> {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: ChoiceChip(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(35)),
               label: Text(
                 category.toUpperCase(),
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.deepPurple,
-                  fontWeight: FontWeight.bold,
-                ),
+                // style: TextStyle(
+                //   color: isSelected ? Colors.white : Colors.black87,
+                //   fontWeight: FontWeight.bold,
+                // ),
               ),
               selected: isSelected,
-              selectedColor: Colors.deepPurple,
-              backgroundColor: Colors.deepPurple[50],
+              selectedColor: widget.isDarkMode ?  Colors.black87: Colors.white,
+              backgroundColor: Color.fromRGBO(102, 154, 177, 100),
               onSelected: (bool selected) {
                 setState(() {
                   selectedCategory = category;
@@ -92,6 +167,7 @@ class _NewsHomeScreenState extends State<NewsHomeScreen> {
 
   Widget _buildNewsCard(dynamic article) {
     return Card(
+      // color: Colors.black12,
       elevation: 5,
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -110,7 +186,7 @@ class _NewsHomeScreenState extends State<NewsHomeScreen> {
                 width: double.infinity,
                 fit: BoxFit.cover,
               )
-                  : Container(height: 200, color: Colors.grey[300]),
+                  : Container(height: 200,), //color: Colors.grey[300]
             ),
             Padding(
               padding: const EdgeInsets.all(16.0),
@@ -122,18 +198,18 @@ class _NewsHomeScreenState extends State<NewsHomeScreen> {
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
-                      color: Colors.deepPurple,
+                      // color: Color.fromRGBO(102, 154, 177, 100),
                     ),
                   ),
                   SizedBox(height: 8),
                   Text(
                     article['description'] ?? 'No Description',
-                    style: TextStyle(fontSize: 14, color: Colors.black54),
+                    // style: TextStyle(fontSize: 14, color: Colors.white),
                   ),
                   SizedBox(height: 8),
                   Text(
                     article['source']['name'] ?? 'Unknown Source',
-                    style: TextStyle(fontSize: 12, color: Colors.deepPurple[200]),
+                    // style: TextStyle(fontSize: 12, color : Color.fromRGBO(102, 154, 177, 100)),
                   ),
                 ],
               ),
@@ -143,4 +219,5 @@ class _NewsHomeScreenState extends State<NewsHomeScreen> {
       ),
     );
   }
+
 }
